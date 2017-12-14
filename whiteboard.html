@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HTML5 Canvas Example</title>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+</head>
+
+<body>
+    <h1 id="debug">asd</h1>
+    <button onClick="eraseAll()">Erase all</button>
+    <canvas id="canvasId" style="border: 1px solid black;position:absolute;left:50%;margin-left:-300px;"></canvas>
+<script>
+    var canvas = document.getElementById("canvasId");
+    var context = canvas.getContext("2d")
+    canvas.addEventListener("mousedown", startPaint);
+    canvas.addEventListener("mousemove", paint);
+    canvas.addEventListener("mouseup", stopPaint);
+    canvas.addEventListener("mouseleave", stopPaint);
+    var ws = new WebSocket("ws://localhost:3000/");
+    var wsget = new WebSocket("ws://localhost:3000/getcords");
+    var paint = false;
+    var clickX = new Array();
+    var clickY = new Array();
+    var startPoint=0;
+
+
+    window.onLoad = canvasInit();
+
+    window.setInterval(function(){
+        wsget.send(startPoint)
+    }, 100);
+
+    function canvasInit(){
+        canvas.width = 600;
+        canvas.height = 600;
+        wsget.onmessage = function (msg) { 
+            var data = JSON.parse(msg.data)
+            startPoint = data.nr;
+            redraw(data.x,data.y);
+        };
+    }
+
+    function startPaint(e) {  
+        paint = true;
+        addClick(e.clientX- canvas.offsetLeft, e.clientY-canvas.offsetTop);
+        redraw(clickX,clickY);
+    }
+
+    function sendDraw(x,y){
+        ws.send(JSON.stringify({"x":x,"y":y}))
+    }
+
+    function paint(e){
+        if(paint==true){
+            addClick(e.clientX- canvas.offsetLeft, e.clientY-canvas.offsetTop);
+            redraw(clickX,clickY);
+        }
+    }
+
+    function stopPaint(){
+        paint=false;
+        clickX.push(-1);
+        clickY.push(-1);
+        sendDraw(clickX,clickY);
+        clickX = new Array();
+        clickY = new Array();
+    }
+
+    function eraseAll(){
+        context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+        $.ajax({
+          type: "GET",
+          url: 'http://localhost:3000/erase',
+          timeout:2000
+        });
+    }
+
+    function addClick(x, y){ 
+        clickX.push(x);
+        clickY.push(y);
+    }
+
+    function redraw(xarr,yarr){
+        context.strokeStyle = "#df4b26";
+        context.lineJoin = "round";
+        context.lineWidth = 2;
+        for(var i=0; i < xarr.length; i++) {
+            context.beginPath();
+            if(xarr[i]!=-1 && xarr[i-1]!=-1){
+                context.moveTo(xarr[i-1], yarr[i-1]);
+                context.lineTo(xarr[i], yarr[i]);
+                context.closePath();
+                context.stroke();
+           }
+        }
+    }
+</script>
+</body>
+</html>
